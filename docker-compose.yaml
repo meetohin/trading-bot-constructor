@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  # Основной торговый сервер
+  trading-server:
+    build:
+      context: ../InvestTinkoff/invest-api-go-sdk/trading-server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+      - API_ENDPOINT=sandbox-invest-public-api.tinkoff.ru:443
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - trading-network
+
+  # Redis для кэширования и pub/sub
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - trading-network
+
+  # PostgreSQL для хранения данных
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: trading_db
+      POSTGRES_USER: trading_user
+      POSTGRES_PASSWORD: trading_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    networks:
+      - trading-network
+
+  # Web-интерфейс (фронтенд)
+  web-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080/api/v1
+    depends_on:
+      - trading-server
+    restart: unless-stopped
+    networks:
+      - trading-network
+
+  # Nginx как реверс-прокси
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - trading-server
+      - web-frontend
+    restart: unless-stopped
+    networks:
+      - trading-network
+
+  # Сервис для мониторинга стримов
+  stream-monitor:
+    build:
+      context: ../InvestTinkoff/invest-api-go-sdk/trading-server
+      dockerfile: Dockerfile.streams
+    environment:
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    depends_on:
+      - redis
+      - trading-server
+    restart: unless-stopped
+    networks:
+      - trading-network
+
+  # Сервис для обработки ордеров
+  order-processor:
+    build:
+      context: ../InvestTinkoff/invest-api-go-sdk/trading-server
+      dockerfile: Dockerfile.orders
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgres://trading_user:trading_password@postgres:5432/trading_db
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    depends_on:
+      - redis
+      - postgres
+      - trading-server
+    restart: unless-stopped
+    networks:
+      - trading-network
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  trading-network:
+    driver: bridge
+
+---
+# Дополнительный файл для разработки
+# docker-compose.dev.yml
+version: '3.8'
+
+services:
+  trading-server:
+    build:
+      context: ../InvestTinkoff/invest-api-go-sdk/trading-server
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+      - "2345:2345"  # порт для отладчика
+    environment:
+      - GIN_MODE=debug
+      - API_ENDPOINT=sandbox-invest-public-api.tinkoff.ru:443
+    volumes:
+      - .:/app
+      - ./config.yaml:/app/config.yaml:ro
+    command: air  # для hot reload
+    networks:
+      - trading-network
+
+  # Остальные сервисы наследуются из основного файла

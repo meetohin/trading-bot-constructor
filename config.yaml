@@ -1,0 +1,222 @@
+# Конфигурация для Tinkoff InvestAPI
+
+#sandbox account
+#t.gkKfTBvbrqlgAkWciZPLmoJqrir2s58eq4W3fDJcKX_sRhraTpaV0hA_-LTWjwgO646LcileWsaye2aWmAYNRA
+
+#ALGOTRADING account
+#AccountId: "2215511023"
+#APIToken: t.gB2F4POks7ok252hAnRxI8fEHNnaUbNzkbytRb1S3S6jGPCB0KA4EZWljpmWsy9PUU3m9-ccDWusQ-6YQVGR9Q
+
+api:
+  # Основные настройки API
+  endpoint: "sandbox-invest-public-api.tinkoff.ru:443"  # или invest-public-api.tinkoff.ru:443 для продакшена
+  token: t.gkKfTBvbrqlgAkWciZPLmoJqrir2s58eq4W3fDJcKX_sRhraTpaV0hA_-LTWjwgO646LcileWsaye2aWmAYNRA
+  app_name: "trading-server"
+  account_id: "2215511023"
+
+  # Настройки повторных попыток
+  retry:
+    disable_resource_exhausted_retry: false
+    disable_all_retry: false
+    max_retries: 3
+    timeout: 30s
+
+  # Настройки подключения
+  connection:
+    keep_alive: 30s
+    timeout: 10s
+    max_idle_conns: 100
+    max_conns_per_host: 50
+
+# Настройки HTTP сервера
+server:
+  port: 8080
+  host: "0.0.0.0"
+  read_timeout: 30s
+  write_timeout: 30s
+  idle_timeout: 120s
+  
+  # CORS настройки
+  cors:
+    allowed_origins: 
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allowed_headers:
+      - "Origin"
+      - "Content-Type"
+      - "Accept"
+      - "Authorization"
+    expose_headers:
+      - "Content-Length"
+    allow_credentials: true
+    max_age: 12h
+
+# Настройки базы данных
+database:
+  postgres:
+    host: "localhost"
+    port: 5432
+    database: "trading_db"
+    username: "trading_user"
+    password: "trading_password"
+    ssl_mode: "disable"
+    max_connections: 25
+    max_idle_connections: 5
+    connection_max_lifetime: 1h
+
+# Настройки Redis
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  database: 0
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  pool_timeout: 4s
+
+# Настройки логирования
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json, console
+  output: "stdout"  # stdout, file
+  file_path: "./logs/trading-server.log"
+  max_size: 100  # MB
+  max_backups: 10
+  max_age: 30  # days
+  compress: true
+
+# Настройки стримов
+streams:
+  market_data:
+    enabled: true
+    buffer_size: 1000
+    instruments:
+      - "BBG004S681W1"  # TCSG
+      - "BBG004730N88"  # SBER
+      - "BBG00475KKY8"  # GAZP
+    subscriptions:
+      - "candles"
+      - "orderbook"
+      - "trades"
+      - "info"
+
+  operations:
+    enabled: true
+    buffer_size: 1000
+    accounts: []  # пустой список означает все доступные аккаунты
+    subscriptions:
+      - "positions"
+      - "portfolio"
+
+# Настройки торговли
+trading:
+  # Ограничения
+  limits:
+    max_order_amount: 1000000  # максимальная сумма ордера в рублях
+    max_orders_per_minute: 10
+    max_positions: 50
+    
+  # Настройки risk management
+  risk_management:
+    enabled: true
+    max_loss_per_day: 50000  # максимальные потери в день в рублях
+    stop_loss_percent: 5.0   # стоп-лосс в процентах
+    take_profit_percent: 15.0  # тейк-профит в процентах
+
+  # Комиссии и сборы
+  fees:
+    broker_commission: 0.025  # комиссия брокера в процентах
+    exchange_fee: 0.01        # биржевой сбор в процентах
+
+# Настройки уведомлений
+notifications:
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_id: ""
+    
+  email:
+    enabled: false
+    smtp_host: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+    from: ""
+    to: []
+
+  webhook:
+    enabled: false
+    url: ""
+    secret: ""
+
+# Настройки мониторинга
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    
+  health_check:
+    enabled: true
+    port: 8081
+    path: "/health"
+    interval: 30s
+    
+  tracing:
+    enabled: false
+    jaeger_endpoint: ""
+
+# Настройки кэширования
+cache:
+  instruments:
+    ttl: 1h
+    max_size: 10000
+    
+  market_data:
+    ttl: 5m
+    max_size: 100000
+    
+  accounts:
+    ttl: 10m
+    max_size: 1000
+
+# Настройки безопасности
+security:
+  jwt:
+    secret: "your-jwt-secret-key-change-this-in-production"
+    expiry: 24h
+    
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    burst: 50
+    
+  api_keys:
+    enabled: false
+    keys: []
+
+# Настройки среды
+environment: "sandbox"  # sandbox, production
+
+# Дополнительные настройки
+features:
+  web_interface: true
+  api_documentation: true
+  metrics_dashboard: true
+  admin_panel: false
+
+# Настройки для разработки
+development:
+  auto_reload: true
+  debug_api_calls: false
+  mock_data: false
+  profiling: false
